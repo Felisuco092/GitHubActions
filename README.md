@@ -8,13 +8,37 @@ This project is an educational example of a task manager implemented in Java 21 
 - Integration tests with Mockito (top-down approach, file names ending with `IT.java`)
 - Ready for CI/CD with GitHub Actions
 
+## Production code — `src/main/java`
+
+The production code is organized under `org.iips.actions` and split across four packages:
+
+### `model`
+- **`Task`** — immutable value object defined as a Java 21 `record`. Fields: `id` (UUID), `description` (String), `completed` (boolean), `dueDate` (LocalDate, optional). Validates that `id` is not null and `description` is not blank in the compact constructor.
+
+### `repository`
+- **`TaskRepository`** — `sealed interface` that declares the persistence contract: `save`, `findById`, `findAll`, and `deleteById`. Only permits `InMemoryTaskRepository`.
+- **`InMemoryTaskRepository`** — concrete implementation backed by a `ConcurrentHashMap` for thread-safe in-memory storage.
+
+### `service`
+- **`TaskService`** — service layer injected with a `TaskRepository` via constructor. Encapsulates all business logic:
+  - `createTask(description, dueDate)` — validates input and persists a new task.
+  - `completeTask(id)` — marks an existing task as completed; throws `TaskNotFoundException` if not found.
+  - `deleteTask(id)` — removes a task; throws `TaskNotFoundException` if not found.
+  - `getAllTasks()` — returns all stored tasks.
+  - `getTaskById(id)` — returns a task by id; throws `TaskNotFoundException` if not found.
+
+### `exception`
+- **`TaskNotFoundException`** — unchecked exception thrown when a task with a given id does not exist.
+- **`InvalidTaskException`** — unchecked exception thrown when task input fails validation.
+
 ## Project Structure
+
 ```
 src/main/java/org/iips/actions/
 ├── model/                # Task.java (record)
 ├── repository/           # TaskRepository.java (sealed interface), InMemoryTaskRepository.java
 ├── service/              # TaskService.java
-├── exception/            # TaskNotFoundException.java, InvalidTaskException.java
+└── exception/            # TaskNotFoundException.java, InvalidTaskException.java
 
 src/test/java/org/iips/actions/
 ├── model/                # TaskTest.java
@@ -24,65 +48,16 @@ src/test/java/org/iips/actions/
 └── integration/          # TaskServiceIT.java (integration tests with Mockito)
 ```
 
-## CI/CD Workflows: Single Job vs Multi Job
+## CI/CD Workflows
 
-Este repositorio incluye dos versiones del workflow de GitHub Actions para ilustrar diferentes enfoques de CI/CD:
+This repository includes three approaches to CI/CD with GitHub Actions:
 
-- **Single Job** (`ci-single-job.yml`): Todas las etapas (compilación, test, build, integración) se ejecutan como pasos dentro de un único job. Es más simple y suficiente para proyectos pequeños, pero limita la visibilidad y el control por etapa.
-- **Multi Job** (`ci-multi-job.yml`): Cada etapa se ejecuta en un job independiente, permitiendo mayor paralelismo, control y visibilidad (por ejemplo, integración de badges por job y gestión de dependencias entre etapas).
+- **`build.yml`** — Single job covering all stages (compile, test, package, javadoc). Mirrors the reference `cicdCalculator` pipeline.
+- **`ci-single-job.yml`** — All stages as steps within a single job. Simple and sufficient for small projects.
+- **`ci-multi-job.yml`** — Each stage as an independent job with `needs:` dependencies (compile → test → build → integration-test; coverage and javadoc run in parallel). Enables per-job status badges and finer failure control.
+- **Individual workflows** (`compile.yml`, `test.yml`, `integration-test.yml`, `javadoc.yml`) — one workflow per stage; each badge shows the stage name clearly.
 
-### Ejemplo de badge por job (multi-job)
-
-Puedes añadir un badge para cada job usando la siguiente sintaxis:
-# Task Manager
-
-This project is an educational example of a task manager in Java 21 using Maven.
-
-## Features
-- Modern structure following professional guidelines (records, sealed interfaces, Optional, Streams, guard clauses, custom exceptions)
-- Unit tests with JUnit 6
-- Integration tests with Mockito (top-down approach, file names ending with `IT.java`)
-- Ready for CI/CD with GitHub Actions
-
-## Project Structure
-```
-src/main/java/org/iips/actions/
-├── model/                # Task.java (record)
-├── repository/           # TaskRepository.java (sealed interface), InMemoryTaskRepository.java
-├── service/              # TaskService.java
-├── exception/            # TaskNotFoundException.java, InvalidTaskException.java
-
-src/test/java/org/iips/actions/
-├── model/                # TaskTest.java
-├── repository/           # InMemoryTaskRepositoryTest.java
-├── service/              # TaskServiceTest.java
-├── exception/            # ExceptionTest.java
-└── integration/          # TaskServiceIT.java (integration tests with Mockito)
-```
-
-
-
-## CI/CD Workflows: Single Job, Multi Job, and One Workflow per Stage
-
-This repository includes three approaches to CI/CD with GitHub Actions, so you can compare their structure and badge behavior:
-
-- **Single Job** (`ci-single-job.yml`): All stages (compile, test, build, integration) run as steps within a single job. This workflow uses a matrix to run on multiple operating systems (`ubuntu-latest`, `windows-latest`, `macos-latest`) and Java versions (21, 25), demonstrating how to test portability and compatibility across platforms and JDKs. Simpler and sufficient for small projects, but limits visibility and control per stage.
-- **Multi Job** (`ci-multi-job.yml`): Each stage runs in a separate job, allowing more parallelism, control, and visibility (e.g., per-job badge integration and dependency management between stages). The badge text always shows the workflow name, not the job name.
-- **One Workflow per Stage** (`compile.yml`, `test.yml`, `build.yml`, `integration-test.yml`): Each stage has its own workflow file. This allows each badge to show the name of the stage (workflow), making it clearer for educational purposes.
-
-### Example: Badges for each approach
-
-
-**Multi Job (badge text = workflow name, includes code coverage and Javadoc):**
-
-![Multi Job Workflow](https://github.com/ajnebro/CICDTaskManager/actions/workflows/ci-multi-job.yml/badge.svg?branch=main)
-
-This workflow also includes:
-- A code coverage stage using JaCoCo. The coverage report is uploaded as an artifact and can be used to teach students about test coverage and code quality.
-- A Javadoc stage that generates API documentation and uploads it as an artifact, illustrating automated documentation in CI/CD.
-
-
-**One Workflow per Stage (badge text = stage name):**
+### Status badges (one workflow per stage)
 
 ![Compile](https://github.com/ajnebro/CICDTaskManager/actions/workflows/compile.yml/badge.svg?branch=main)
 ![Test](https://github.com/ajnebro/CICDTaskManager/actions/workflows/test.yml/badge.svg?branch=main)
@@ -90,33 +65,33 @@ This workflow also includes:
 ![Integration Test](https://github.com/ajnebro/CICDTaskManager/actions/workflows/integration-test.yml/badge.svg?branch=main)
 ![Javadoc](https://github.com/ajnebro/CICDTaskManager/actions/workflows/javadoc.yml/badge.svg?branch=main)
 
-There is also an independent workflow for Javadoc generation, with its own badge. This demonstrates how documentation can be automated and tracked separately in CI/CD.
-
-> Note: The badge text for multi-job workflows always shows the workflow name, not the job name. With one workflow per stage, the badge text matches the stage name, which is useful for teaching and documentation.
-
 ## How to build and test
-
-You can use the following Maven commands:
 
 ```bash
 # Compile the source code
 mvn compile
 
-# Run unit tests (files ending with Test.java)
+# Run unit tests
 mvn test
 
 # Build the JAR artifact
 mvn package
 
-# Run integration tests (files ending with IT.java)
+# Run integration tests
 mvn integration-test
+
+# Generate coverage report (opt-in)
+mvn test -P coverage
+
+# Generate Javadoc
+mvn javadoc:javadoc
 ```
 
 ## Main Dependencies
 - Java 21+
 - Maven 3.9+
-- JUnit 5
-- Mockito (core + mockito-junit-jupiter)
+- JUnit Jupiter 6.0.3
+- Mockito 5.23.0 (core + mockito-junit-jupiter)
 
 ## License
 MIT
